@@ -80,6 +80,7 @@ public class MTELinkedInputHatchGui extends MTEHatchBaseGui<MTELinkedInputHatch>
                 2,
                 2,
                 ($x, $y, index) -> new FluidSlot().syncHandler(new FluidSlotSyncHandler(fluidTanks[index])))
+            .marginTop(6)
             .center();
     }
 }
