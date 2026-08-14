@@ -1,5 +1,8 @@
 package com.xt9y.features;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.xt9y.features.mte.MTELinkedInputHatch;
 
 import cpw.mods.fml.common.Mod;
@@ -18,6 +21,7 @@ public class XT9YFeatures {
 
     public static final String MODID = "xt9yfeatures";
     public static final String MODNAME = "XT9Y Features";
+    public static final Logger LOGGER = LogManager.getLogger("XT9Y-Features");
 
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
@@ -36,6 +40,7 @@ public class XT9YFeatures {
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
         WildcardToggleHandler.init();
+        WildcardTooltipHandler.init();
     }
 
     @Mod.EventHandler

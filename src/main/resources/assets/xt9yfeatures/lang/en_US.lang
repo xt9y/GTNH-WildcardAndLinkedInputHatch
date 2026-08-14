@@ -2,3 +2,4 @@ gt.blockmachines.hatch_input_linked.desc=4x %s L input hatch linked together wir
 GT5U.infodata.hatch.crafting_input_me.wildcard.enable=§aWildcard Pattern Expansion
 GT5U.infodata.hatch.crafting_input_me.wildcard.disabled=§cWildcard Pattern Expansion
 ggfab.wildcard.toggle=Wildcard expansion: %s
+xt9yfeatures.tooltip.wildcard.mallet=Sneak + soft mallet toggles wildcard pattern expansion

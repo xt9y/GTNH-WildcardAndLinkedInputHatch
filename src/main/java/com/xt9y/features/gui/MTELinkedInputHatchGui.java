@@ -13,7 +13,6 @@ import com.cleanroommc.modularui.value.sync.StringSyncValue;
 import com.cleanroommc.modularui.widget.ParentWidget;
 import com.cleanroommc.modularui.widgets.ToggleButton;
 import com.cleanroommc.modularui.widgets.layout.Flow;
-import com.cleanroommc.modularui.widgets.layout.Grid;
 import com.cleanroommc.modularui.widgets.slot.FluidSlot;
 import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 import com.xt9y.features.mte.MTELinkedInputHatch;
@@ -75,12 +74,23 @@ public class MTELinkedInputHatchGui extends MTEHatchBaseGui<MTELinkedInputHatch>
 
     private IWidget createFluidSlots(PanelSyncManager syncManager) {
         FluidStackTank[] fluidTanks = machine.getFluidTanks();
-        return new Grid().coverChildren()
-            .gridOfWidthHeight(
-                2,
-                2,
-                ($x, $y, index) -> new FluidSlot().syncHandler(new FluidSlotSyncHandler(fluidTanks[index])))
-            .marginTop(6)
-            .center();
+        return Flow.column()
+            .coverChildren()
+            .marginTop(2)
+            .child(
+                Flow.row()
+                    .coverChildren()
+                    .child(createFluidSlot(fluidTanks[0]))
+                    .child(createFluidSlot(fluidTanks[1])))
+            .child(
+                Flow.row()
+                    .coverChildren()
+                    .child(createFluidSlot(fluidTanks[2]))
+                    .child(createFluidSlot(fluidTanks[3])));
+    }
+
+    private IWidget createFluidSlot(FluidStackTank tank) {
+        return new FluidSlot().size(18)
+            .syncHandler(new FluidSlotSyncHandler(tank));
     }
 }

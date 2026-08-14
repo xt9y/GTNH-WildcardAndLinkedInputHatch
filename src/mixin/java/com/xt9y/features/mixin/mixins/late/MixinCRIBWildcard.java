@@ -1,10 +1,12 @@
 package com.xt9y.features.mixin.mixins.late;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.util.StatCollector;
 import net.minecraft.world.World;
 
 import org.spongepowered.asm.mixin.Implements;
@@ -18,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.xt9y.features.WildcardPatternHelper;
+import com.xt9y.features.XT9YFeatures;
 import com.xt9y.features.api.IWildcardToggleable;
 
 import appeng.api.networking.crafting.ICraftingPatternDetails;
@@ -53,9 +56,19 @@ public abstract class MixinCRIBWildcard {
 
     public void xt9y$setWildcardEnabled(boolean val) {
         if (xt9y$enableWildcardExpansion != val) {
+            XT9YFeatures.LOGGER.info("CRIB wildcard pattern expansion {}", val);
             xt9y$enableWildcardExpansion = val;
             needPatternSync = true;
         }
+    }
+
+    @Inject(method = "getDescription", at = @At("RETURN"), cancellable = true)
+    private void gt5u$onGetDescription(CallbackInfoReturnable<String[]> cir) {
+        String[] original = cir.getReturnValue();
+        if (original == null) return;
+        String[] extended = Arrays.copyOf(original, original.length + 1);
+        extended[original.length] = StatCollector.translateToLocal("xt9yfeatures.tooltip.wildcard.mallet");
+        cir.setReturnValue(extended);
     }
 
     @Inject(method = "saveNBTData", at = @At("TAIL"))

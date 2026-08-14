@@ -5,7 +5,14 @@
   "refmap": "mixins.xt9yfeatures.refmap.json",
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
-  "mixins": [],
+  "mixins": [
+    "MixinCRIBCircuitFromPattern",
+    "MixinCRIBWildcard",
+    "MixinCRIBGuiWildcard",
+    "MixinMTETieredMachineBlockBaseGui",
+    "MixinDualityInterface",
+    "MixinTileInterface"
+  ],
   "client": [],
   "server": []
 }

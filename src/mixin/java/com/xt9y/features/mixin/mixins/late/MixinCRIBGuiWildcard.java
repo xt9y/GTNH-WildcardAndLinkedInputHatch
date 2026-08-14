@@ -1,5 +1,10 @@
 package com.xt9y.features.mixin.mixins.late;
 
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.util.ChatComponentTranslation;
+import net.minecraft.util.EnumChatFormatting;
+import net.minecraft.util.StatCollector;
+
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,26 +25,36 @@ import gregtech.common.tileentities.machines.MTEHatchCraftingInputME;
 @Mixin(value = MTEHatchCraftingInputMEGui.class, remap = false)
 public abstract class MixinCRIBGuiWildcard {
 
-    @Inject(method = "createBottomLeftCornerFlow", at = @At("RETURN"), remap = false)
+    @Inject(method = "createBottomLeftCornerFlow", at = @At("RETURN"), remap = false, cancellable = true)
     private void gt5u$appendWildcardButton(ModularPanel panel, PanelSyncManager syncManager,
         CallbackInfoReturnable<Flow> cir) {
         cir.setReturnValue(
             cir.getReturnValue()
-                .child(createWildcardButton()));
+                .child(createWildcardButton(syncManager)));
     }
 
     @Unique
-    private ToggleButton createWildcardButton() {
+    private ToggleButton createWildcardButton(PanelSyncManager syncManager) {
         MTEHatchCraftingInputME machine = (MTEHatchCraftingInputME) ((MixinMTETieredMachineBlockBaseGui) (Object) this)
             .getMachine();
         IWildcardToggleable toggleable = (IWildcardToggleable) machine;
-        BooleanSyncValue wildcardSync = new BooleanSyncValue(
-            () -> toggleable.isWildcardEnabled(),
-            val -> toggleable.setWildcardEnabled(val)).allowC2S();
+        BooleanSyncValue wildcardSync = new BooleanSyncValue(() -> toggleable.isWildcardEnabled(), val -> {
+            if (toggleable.isWildcardEnabled() == val) return;
+            toggleable.setWildcardEnabled(val);
+            EntityPlayer player = syncManager.getPlayer();
+            if (player != null) {
+                player.addChatMessage(
+                    new ChatComponentTranslation(
+                        "ggfab.wildcard.toggle",
+                        val ? EnumChatFormatting.GREEN + "ON" + EnumChatFormatting.RESET
+                            : EnumChatFormatting.RED + "OFF" + EnumChatFormatting.RESET));
+            }
+        }).allowC2S();
 
+        String hint = StatCollector.translateToLocal("xt9yfeatures.tooltip.wildcard.mallet");
         return new ToggleButton().value(wildcardSync)
             .overlay(GTGuiTextures.OVERLAY_BUTTON_BATCH_MODE_ON)
-            .addTooltip(false, "Wildcard Expansion:\n§7Disabled")
-            .addTooltip(true, "Wildcard Expansion:\n§7Enabled");
+            .addTooltip(false, "Wildcard Expansion:\n§7Disabled\n§7" + hint)
+            .addTooltip(true, "Wildcard Expansion:\n§7Enabled\n§7" + hint);
     }
 }

@@ -19,6 +19,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import com.xt9y.features.WildcardPatternHelper;
+import com.xt9y.features.XT9YFeatures;
 import com.xt9y.features.api.IWildcardToggleable;
 
 import appeng.api.networking.crafting.ICraftingPatternDetails;
@@ -56,7 +57,10 @@ public abstract class MixinDualityInterface implements IWildcardToggleable {
     }
 
     public void xt9y$setWildcardEnabled(boolean enabled) {
-        xt9y$enableWildcardExpansion = enabled;
+        if (xt9y$enableWildcardExpansion != enabled) {
+            XT9YFeatures.LOGGER.info("Interface wildcard pattern expansion {}", enabled);
+            xt9y$enableWildcardExpansion = enabled;
+        }
     }
 
     @Inject(method = "writeToNBT", at = @At("TAIL"))
