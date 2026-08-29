@@ -36,17 +36,17 @@ jobs:
       - name: Setup workspace
         run: ./gradlew --build-cache --stacktrace setupCIWorkspace
 
-      - name: Compile with captured output
-        id: compile
+      - name: Build with captured output
+        id: build
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew --build-cache --stacktrace --console=plain assemble 2>&1 | tee compile.log
+          ./gradlew --build-cache --stacktrace --console=plain build 2>&1 | tee build.log
 
-      - name: Upload compile log
+      - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: compile-diagnostics-${{ github.run_id }}
-          path: compile.log
+          name: build-diagnostics-${{ github.run_id }}
+          path: build.log
           retention-days: 7
