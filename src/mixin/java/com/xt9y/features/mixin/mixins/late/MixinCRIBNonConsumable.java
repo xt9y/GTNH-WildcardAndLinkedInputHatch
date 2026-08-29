@@ -53,8 +53,7 @@ public abstract class MixinCRIBNonConsumable {
     private Map<ICraftingPatternDetails, PatternSlot<MTEHatchCraftingInputME>> patternDetailsPatternSlotMap;
 
     @Unique
-    private final IdentityHashMap<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>>
-        xt9y$borrowedNc = new IdentityHashMap<>();
+    private final IdentityHashMap<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>> xt9y$borrowedNc = new IdentityHashMap<>();
 
     @Unique
     private BaseActionSource xt9y$requestSource() {
@@ -120,8 +119,8 @@ public abstract class MixinCRIBNonConsumable {
 
                 IAEItemStack request = required.copy()
                     .setStackSize(amount);
-                IAEItemStack simulated = Platform.poweredExtraction(
-                    getProxy().getEnergy(), storage, request, source, Actionable.SIMULATE);
+                IAEItemStack simulated = Platform
+                    .poweredExtraction(getProxy().getEnergy(), storage, request, source, Actionable.SIMULATE);
                 if (simulated == null || simulated.getStackSize() < amount) return false;
                 missing.add(request);
             }

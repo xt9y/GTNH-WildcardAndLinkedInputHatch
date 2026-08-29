@@ -73,7 +73,8 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     private void xt9y$toggleOnServer(int slotIndex) {
         xt9y$refreshPatternState();
         if (isCraftingMode()) return;
-        if (slotIndex < 0 || slotIndex >= inputsSync.get().getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
+        if (slotIndex < 0 || slotIndex >= inputsSync.get()
+            .getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
 
         IAEStack<?> stack = inputsSync.get()
             .getAEStackInSlot(slotIndex);
@@ -119,10 +120,14 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     private int xt9y$sanitizedMask() {
         int mask = xt9y$ncMaskSync.get();
         int sanitized = 0;
-        int size = Math.min(inputsSync.get().getSizeInventory(), Integer.SIZE - 1);
+        int size = Math.min(
+            inputsSync.get()
+                .getSizeInventory(),
+            Integer.SIZE - 1);
         for (int slot = 0; slot < size; slot++) {
             if ((mask & (1 << slot)) == 0) continue;
-            if (inputsSync.get().getAEStackInSlot(slot) instanceof IAEItemStack) {
+            if (inputsSync.get()
+                .getAEStackInSlot(slot) instanceof IAEItemStack) {
                 sanitized |= 1 << slot;
             }
         }
@@ -132,8 +137,7 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     @Override
     public boolean xt9y$isNonConsumable(int slotIndex) {
         xt9y$refreshPatternState();
-        return !isCraftingMode()
-            && slotIndex >= 0
+        return !isCraftingMode() && slotIndex >= 0
             && slotIndex < Integer.SIZE - 1
             && (xt9y$ncMaskSync.get() & (1 << slotIndex)) != 0;
     }
@@ -142,8 +146,10 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     public void xt9y$requestToggleNonConsumable(int slotIndex) {
         xt9y$refreshPatternState();
         if (isCraftingMode() || xt9y$toggleNcAction == null) return;
-        if (slotIndex < 0 || slotIndex >= inputsSync.get().getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
-        if (!(inputsSync.get().getAEStackInSlot(slotIndex) instanceof IAEItemStack)) return;
+        if (slotIndex < 0 || slotIndex >= inputsSync.get()
+            .getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
+        if (!(inputsSync.get()
+            .getAEStackInSlot(slotIndex) instanceof IAEItemStack)) return;
 
         // Immediate client feedback. The server action sends the authoritative mask back afterwards.
         xt9y$ncMaskSync.setLocalValue(xt9y$ncMaskSync.get() ^ (1 << slotIndex));

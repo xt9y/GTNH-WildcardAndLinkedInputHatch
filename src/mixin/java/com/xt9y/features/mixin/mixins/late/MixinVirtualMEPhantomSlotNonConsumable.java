@@ -24,7 +24,8 @@ import appeng.container.implementations.ContainerPatternTerm;
 public abstract class MixinVirtualMEPhantomSlotNonConsumable {
 
     @Inject(method = "handleMouseClicked", at = @At("HEAD"), cancellable = true)
-    private void xt9y$toggleNonConsumable(ItemStack itemStack, boolean isExtraAction, int mouseButton, CallbackInfo ci) {
+    private void xt9y$toggleNonConsumable(ItemStack itemStack, boolean isExtraAction, int mouseButton,
+        CallbackInfo ci) {
         if (mouseButton != 1 || !GuiScreen.isShiftKeyDown()) return;
         if (!((Object) this instanceof VirtualMEPatternSlot slot)) return;
         if (slot.getStorageName() != StorageName.CRAFTING_INPUT) return;

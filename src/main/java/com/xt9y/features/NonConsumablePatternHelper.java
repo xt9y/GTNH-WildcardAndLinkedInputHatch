@@ -25,7 +25,8 @@ public final class NonConsumablePatternHelper {
     public static int readMask(ItemStack patternStack) {
         if (patternStack == null || patternStack.getTagCompound() == null) return 0;
         int mask = 0;
-        for (int slot : patternStack.getTagCompound().getIntArray(NBT_KEY)) {
+        for (int slot : patternStack.getTagCompound()
+            .getIntArray(NBT_KEY)) {
             if (slot >= 0 && slot < Integer.SIZE - 1) {
                 mask |= 1 << slot;
             }
@@ -172,8 +173,7 @@ public final class NonConsumablePatternHelper {
 
         @Override
         public boolean isValidItemForSlot(int slotIndex, ItemStack itemStack, World world) {
-            return slotIndex >= 0
-                && slotIndex < aeInputs.length
+            return slotIndex >= 0 && slotIndex < aeInputs.length
                 && (nonConsumableMask & (1 << slotIndex)) == 0
                 && delegate.isValidItemForSlot(slotIndex, itemStack, world);
         }
