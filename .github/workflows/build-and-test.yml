@@ -6,6 +6,9 @@ on:
   push:
     branches: [ master, main ]
 
+permissions:
+  contents: write
+
 jobs:
   build-and-test:
     uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
@@ -39,16 +42,17 @@ jobs:
       - name: Apply repository formatting
         run: ./gradlew --build-cache --stacktrace --console=plain spotlessApply
 
-      - name: Collect formatted sources
+      - name: Commit formatted sources
         shell: bash
         run: |
-          mkdir -p spotless-output
-          while IFS= read -r file; do
-            [ -f "$file" ] || continue
-            mkdir -p "spotless-output/$(dirname "$file")"
-            cp "$file" "spotless-output/$file"
-          done < <(git diff --name-only -- src)
-          git diff -- src > spotless.patch
+          if git diff --quiet -- src; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src
+          git commit -m "style: apply spotless formatting"
+          git push origin HEAD:master
 
       - name: Build formatted tree
         id: build
@@ -62,8 +66,5 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: build-diagnostics-${{ github.run_id }}
-          path: |
-            build.log
-            spotless.patch
-            spotless-output/
+          path: build.log
           retention-days: 7
