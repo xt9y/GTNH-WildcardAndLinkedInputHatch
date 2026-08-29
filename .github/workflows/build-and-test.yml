@@ -10,3 +10,66 @@ jobs:
   build-and-test:
     uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
     secrets: inherit
+
+  runtime-diagnostics:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up JDKs
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: |
+            8
+            17
+            21
+            25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Setup workspace
+        run: ./gradlew --build-cache --stacktrace setupCIWorkspace
+
+      - name: Build
+        run: ./gradlew --build-cache --stacktrace build
+
+      - name: Run server and capture log
+        shell: bash
+        run: |
+          mkdir -p run/server
+          echo "eula=true" > run/eula.txt
+          echo "eula=true" > run/server/eula.txt
+          printf 'level-seed=-6202107849386030209\nonline-mode=true\n' > run/server.properties
+          printf 'level-seed=-6202107849386030209\nonline-mode=true\n' > run/server/server.properties
+          echo "stop" > run/stop.txt
+          timeout 90 ./gradlew --build-cache --stacktrace runServer 2>&1 < run/stop.txt | tee server.log || true
+
+      - name: Print scanner-relevant lines
+        if: always()
+        shell: bash
+        run: |
+          grep -n -B 20 -A 40 -E 'Fatal errors were detected|incorrect state ERRORED|Exception stopping the server|Done \(.+\)!' server.log || true
+          echo '--- tail ---'
+          tail -n 250 server.log || true
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtime-diagnostics-${{ github.run_id }}
+          path: |
+            server.log
+            run/crash-reports/
+            run/logs/
+            run/server/logs/
+          if-no-files-found: ignore
+          retention-days: 7
