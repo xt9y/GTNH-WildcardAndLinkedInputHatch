@@ -21,6 +21,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.xt9y.features.api.INonConsumablePatternDetails;
 
+import appeng.api.AEApi;
 import appeng.api.config.Actionable;
 import appeng.api.networking.crafting.ICraftingPatternDetails;
 import appeng.api.networking.security.BaseActionSource;
@@ -74,7 +75,7 @@ public abstract class MixinCRIBNonConsumable {
     }
 
     @Unique
-    private void xt9y$reconcileBorrowed(PatternSlot<MTEHatchCraftingInputME> slot) {
+    private void xt9y$pruneBorrowedToActual(PatternSlot<MTEHatchCraftingInputME> slot) {
         Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
         if (borrowed == null) return;
 
@@ -86,8 +87,27 @@ public abstract class MixinCRIBNonConsumable {
     }
 
     @Unique
+    private void xt9y$restoreBorrowed(PatternSlot<MTEHatchCraftingInputME> slot) {
+        Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
+        if (borrowed == null || borrowed.isEmpty()) return;
+
+        Map<GTUtility.ItemId, Integer> actual = xt9y$actualItems(slot);
+        for (Map.Entry<GTUtility.ItemId, Integer> entry : borrowed.entrySet()) {
+            int missing = entry.getValue() - actual.getOrDefault(entry.getKey(), 0);
+            if (missing <= 0) continue;
+
+            ItemStack stack = entry.getKey()
+                .getItemStack();
+            stack.stackSize = missing;
+            IAEItemStack restored = AEApi.instance()
+                .storage()
+                .createItemStack(stack);
+            ((AccessorCRIBPatternSlot) (Object) slot).xt9y$insertItem(restored);
+        }
+    }
+
+    @Unique
     private int xt9y$borrowedAmount(PatternSlot<MTEHatchCraftingInputME> slot, GTUtility.ItemId id) {
-        xt9y$reconcileBorrowed(slot);
         Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
         return borrowed == null ? 0 : borrowed.getOrDefault(id, 0);
     }
@@ -104,6 +124,12 @@ public abstract class MixinCRIBNonConsumable {
         INonConsumablePatternDetails details) {
         IAEItemStack[] requirements = details.xt9y$getNonConsumableInputs();
         if (requirements.length == 0) return true;
+
+        // A normal GT recipe may decrement an NC-marked item because the underlying recipe does not know about our
+        // AE2-side NC flag. Keep the original reservation authoritative and restore a consumed copy before accepting
+        // another push. This turns arbitrary processing-pattern inputs into true catalysts instead of only working for
+        // GT recipes whose input already has stackSize 0 (molds, circuits, lenses, etc.).
+        xt9y$restoreBorrowed(slot);
 
         try {
             IMEMonitor<IAEItemStack> storage = getProxy().getStorage()
@@ -184,7 +210,11 @@ public abstract class MixinCRIBNonConsumable {
         for (PatternSlot<MTEHatchCraftingInputME> slot : internalInventory) {
             if (slot == null || !xt9y$borrowedNc.containsKey(slot)) continue;
 
-            xt9y$reconcileBorrowed(slot);
+            // Recipes with ordinary positive-size inputs consume the catalyst. Recreate the reserved copy inside the
+            // CRIB before deciding whether the slot is finished. Nothing new is extracted from ME here: this is the
+            // same borrowed catalyst represented by the reservation map.
+            xt9y$restoreBorrowed(slot);
+
             Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
             if (borrowed == null || borrowed.isEmpty()) continue;
             if (!slot.isFluidEmpty()) continue;
@@ -205,7 +235,9 @@ public abstract class MixinCRIBNonConsumable {
                 continue;
             }
 
-            xt9y$reconcileBorrowed(slot);
+            // Only an explicit refund is allowed to reduce the reservation. A recipe consuming an NC item must not do
+            // so, otherwise arbitrary catalysts disappear from our bookkeeping after their first operation.
+            xt9y$pruneBorrowedToActual(slot);
         }
     }
 
@@ -224,7 +256,6 @@ public abstract class MixinCRIBNonConsumable {
         for (int index = 0; index < internalInventory.length; index++) {
             PatternSlot<MTEHatchCraftingInputME> slot = internalInventory[index];
             if (slot == null) continue;
-            xt9y$reconcileBorrowed(slot);
 
             Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
             if (borrowed == null || borrowed.isEmpty()) continue;
@@ -272,8 +303,10 @@ public abstract class MixinCRIBNonConsumable {
             if (!borrowed.isEmpty()) xt9y$borrowedNc.put(slot, borrowed);
         }
 
+        // If the game was saved after a machine consumed an arbitrary NC catalyst but before the next hatch tick,
+        // recover the reserved copy from NBT instead of silently losing it.
         for (PatternSlot<MTEHatchCraftingInputME> slot : internalInventory) {
-            if (slot != null) xt9y$reconcileBorrowed(slot);
+            if (slot != null) xt9y$restoreBorrowed(slot);
         }
     }
 }
