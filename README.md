@@ -1,58 +1,70 @@
 # xt9y-features
 
-A standalone GTNH addon that re-introduces the experimental XT9Y features on top of the
-unmodified GTNH pack (no custom `gregtech` jar required).
+## Linked Input Hatch
 
-## Features
+### Feature
+- Adds a LuV **Linked Input Hatch** with **4 fluid tanks**, each holding **64,000 L**.
+- Hatches in the same world with the same channel share the same four fluid tanks.
+- Channels can be public or private. Private channels are isolated per owner.
+- Each hatch has an integrated-circuit slot; the circuit is local configuration while the fluids are shared.
+- A shared channel is locked while one linked hatch is actively supplying a recipe, preventing another hatch on that channel from consuming the same fluids at the same time.
+- Configuration can be copied between hatches with a Data Stick.
 
-### Wireless Linked Input Hatch
-- 4x input hatch (9 slots each) linked wirelessly to a single channel.
-- Left/right-click with a data stick to copy/paste the channel + circuit configuration.
-- Channels do not cross world boundaries.
+### Use
+1. Open the hatch GUI.
+2. Enter the same channel name on every hatch that should share fluids.
+3. Enable **Private** if the channel should only link hatches owned by you.
+4. Put fluids into any linked hatch; all hatches on that channel see the same four tanks.
+5. Put an Integrated Circuit in the circuit slot when the connected machine needs one.
+6. **Left-click with a Data Stick** to copy channel/private/circuit configuration.
+7. **Right-click with that Data Stick** on another Linked Input Hatch to paste it.
+8. Normal screwdriver right-click toggles fluid filtering; sneaking screwdriver right-click toggles fluid sorting.
 
-### CRIB wildcard pattern expansion
-- Adds a wildcard toggle button to the Crafting Input Bus (ME) GUI (bottom-left corner).
-- When enabled, patterns with wildcard item entries match against all matching item variants.
-- The same wildcard state can also be toggled by sneaking + right-clicking the CRIB with a
-  soft mallet.
+## CRIB Wildcard Patterns
 
-### Generic CRIB non-consumable pattern inputs
-- In an AE2 Pattern Terminal, switch to a processing pattern and **Shift + right-click** any
-  item input to toggle it as non-consumable.
-- Non-consumable inputs show a small **NC** marker in the top-left of their pattern slot.
-- The NC state is stored directly on the encoded pattern, so it survives moves, copies and
-  restarts.
-- NC inputs are generic: any item can be marked. There is no mold/circuit/item whitelist.
-- AE2 does not multiply NC inputs by the requested craft count. The CRIB borrows only the
-  encoded amount from ME storage (for example one mold for 2,000 recipe operations), keeps
-  that amount reserved while the consumable inputs are processed, then returns it to ME.
-- The NC item must already exist in ME storage when the CRIB starts the processing pattern;
-  it is borrowed as a catalyst and is not recursively autocrafted as part of the parent job.
-- Borrowed NC reservations are persisted in the CRIB NBT so a server restart cannot strand
-  them.
-- Only mark an input NC when the GregTech recipe itself treats that input as non-consumable.
-  The flag changes AE/CRIB transport semantics; it does not change the underlying GregTech
-  recipe's consumption rules.
+### Feature
+- Adds wildcard material expansion to the **Crafting Input Bus (ME) / CRIB**.
+- When enabled, a pattern containing material-based GregTech ore-prefix items is expanded across all valid unifiable materials while keeping the same prefixes and stack sizes.
+- All expandable material-based inputs and outputs in one pattern must originate from the same material.
+- The wildcard state is saved on the CRIB.
 
-### CRIB per-pattern circuit configuration
-- Circuit configuration is read from the patterns themselves, so a single CRIB can handle
-  recipes that require different circuits.
+### Use
+1. Put the pattern in the CRIB.
+2. Enable wildcard mode with the wildcard button in the CRIB GUI, or **sneak + right-click the CRIB with a Soft Mallet**.
+3. AE2 will then see the generated material variants as crafting options.
 
-### AE2 Interface wildcard expansion
-- Interfaces can be set to wildcard expansion mode so their patterns also match item variants.
-- **There is no GUI button.** Toggle it by **sneaking + right-clicking the interface with a
-  soft mallet** (same as the CRIB). You will get a chat message confirming the new state.
+## AE2 Interface Wildcard Patterns
 
-## Requirements
-- GTNH 2.9.0-beta-1 (or compatible)
-- gregtech
-- appliedenergistics2
+### Feature
+- Adds the same material wildcard expansion to normal **AE2 Interfaces**.
+- The wildcard state is saved on the Interface.
 
-## Installation
-Drop `xt9yfeatures-vX.Y.Z.jar` into the `mods/` folder. No configuration required.
+### Use
+1. Put the pattern in the Interface.
+2. **Sneak + right-click the Interface with a Soft Mallet** to toggle wildcard expansion.
+3. A chat message confirms whether wildcard mode is on or off.
 
-## Building
-```
-./gradlew build
-```
-The resulting jar is in `build/libs/`.
+## CRIB Non-Consumable Pattern Inputs
+
+### Feature
+- Processing-pattern item inputs can be marked **NC** and used as reusable catalysts.
+- NC state is stored directly on the encoded pattern and survives moving the pattern and restarting the game.
+- Any item input can be marked NC; matching uses the exact item, metadata and NBT.
+- AE2 does not multiply NC inputs by the requested craft count and does not recursively autocraft them for the parent craft.
+- The CRIB requires the encoded NC amount to already exist in ME storage before accepting the pattern push.
+- The required NC item is reserved from ME once per active CRIB pattern slot.
+- The reserved real item never enters the CRIB consumable inventory. GregTech receives disposable synthetic copies for recipe validation and parallel calculation, so the real catalyst cannot be consumed by the machine.
+- NC inputs do not limit machine parallelism.
+- The reservation is returned to ME after the real consumable items and fluids for that CRIB slot are gone.
+- Reservations are saved in CRIB NBT so they survive a restart.
+- NC applies only to **processing-pattern item inputs**.
+- Wildcard expansion and NC can be used together; wildcard expansion happens first and the NC marking is preserved on the resulting CRIB crafting options.
+
+### Use
+1. Open an AE2 Pattern Terminal and switch to a **Processing Pattern**.
+2. Place the catalyst in an input slot with the amount that must be reserved from ME.
+3. **Shift + right-click that input slot**.
+4. The slot shows **NC**.
+5. Encode the pattern and put it in a CRIB.
+6. Keep the required NC item available in ME storage.
+7. Start the craft normally. The CRIB reserves the catalyst, uses it for recipe validation without consuming it, and returns it when the slot finishes.
