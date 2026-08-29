@@ -10,3 +10,43 @@ jobs:
   build-and-test:
     uses: GTNewHorizons/GTNH-Actions-Workflows/.github/workflows/build-and-test.yml@master
     secrets: inherit
+
+  compile-diagnostics:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDKs
+        uses: actions/setup-java@v5
+        with:
+          distribution: zulu
+          java-version: |
+            8
+            17
+            21
+            25
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Grant execute permission
+        run: chmod +x gradlew
+
+      - name: Setup workspace
+        run: ./gradlew --build-cache --stacktrace setupCIWorkspace
+
+      - name: Compile with captured output
+        id: compile
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --build-cache --stacktrace --console=plain assemble 2>&1 | tee compile.log
+
+      - name: Upload compile log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compile-diagnostics-${{ github.run_id }}
+          path: compile.log
+          retention-days: 7
