@@ -6,13 +6,18 @@
   "target": "@env(DEFAULT)",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-    "MixinCRIBCircuitFromPattern",
+    "AccessorCRIBPatternSlot",
+    "MixinContainerPatternTermNonConsumable",
+    "MixinCRIBNonConsumable",
     "MixinCRIBWildcard",
     "MixinCRIBGuiWildcard",
     "MixinMTETieredMachineBlockBaseGui",
     "MixinDualityInterface",
     "MixinTileInterface"
   ],
-  "client": [],
+  "client": [
+    "MixinVirtualMEPhantomSlotNonConsumable",
+    "MixinVirtualMESlotNonConsumable"
+  ],
   "server": []
 }

@@ -16,6 +16,24 @@ unmodified GTNH pack (no custom `gregtech` jar required).
 - The same wildcard state can also be toggled by sneaking + right-clicking the CRIB with a
   soft mallet.
 
+### Generic CRIB non-consumable pattern inputs
+- In an AE2 Pattern Terminal, switch to a processing pattern and **Shift + right-click** any
+  item input to toggle it as non-consumable.
+- Non-consumable inputs show a small **NC** marker in the top-left of their pattern slot.
+- The NC state is stored directly on the encoded pattern, so it survives moves, copies and
+  restarts.
+- NC inputs are generic: any item can be marked. There is no mold/circuit/item whitelist.
+- AE2 does not multiply NC inputs by the requested craft count. The CRIB borrows only the
+  encoded amount from ME storage (for example one mold for 2,000 recipe operations), keeps
+  that amount reserved while the consumable inputs are processed, then returns it to ME.
+- The NC item must already exist in ME storage when the CRIB starts the processing pattern;
+  it is borrowed as a catalyst and is not recursively autocrafted as part of the parent job.
+- Borrowed NC reservations are persisted in the CRIB NBT so a server restart cannot strand
+  them.
+- Only mark an input NC when the GregTech recipe itself treats that input as non-consumable.
+  The flag changes AE/CRIB transport semantics; it does not change the underlying GregTech
+  recipe's consumption rules.
+
 ### CRIB per-pattern circuit configuration
 - Circuit configuration is read from the patterns themselves, so a single CRIB can handle
   recipes that require different circuits.
