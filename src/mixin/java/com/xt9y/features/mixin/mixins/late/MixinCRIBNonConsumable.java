@@ -3,6 +3,7 @@ package com.xt9y.features.mixin.mixins.late;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import com.xt9y.features.NonConsumableCRIBRuntime;
 import com.xt9y.features.api.INonConsumablePatternDetails;
 
 import appeng.api.AEApi;
@@ -53,6 +55,10 @@ public abstract class MixinCRIBNonConsumable {
     @Shadow(remap = false)
     private Map<ICraftingPatternDetails, PatternSlot<MTEHatchCraftingInputME>> patternDetailsPatternSlotMap;
 
+    /**
+     * Items removed from ME and owned by one active CRIB pattern slot. They are deliberately not inserted into the
+     * PatternSlot item inventory: that inventory is GregTech's consumable input storage.
+     */
     @Unique
     private final IdentityHashMap<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>> xt9y$borrowedNc = new IdentityHashMap<>();
 
@@ -62,48 +68,6 @@ public abstract class MixinCRIBNonConsumable {
             requestSource = new MachineSource((IActionHost) ((IMetaTileEntity) this).getBaseMetaTileEntity());
         }
         return requestSource;
-    }
-
-    @Unique
-    private Map<GTUtility.ItemId, Integer> xt9y$actualItems(PatternSlot<MTEHatchCraftingInputME> slot) {
-        Map<GTUtility.ItemId, Integer> result = new HashMap<>();
-        for (ItemStack stack : slot.getItemInputs()) {
-            if (stack == null || stack.stackSize <= 0) continue;
-            result.merge(GTUtility.ItemId.create(stack), stack.stackSize, Integer::sum);
-        }
-        return result;
-    }
-
-    @Unique
-    private void xt9y$pruneBorrowedToActual(PatternSlot<MTEHatchCraftingInputME> slot) {
-        Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
-        if (borrowed == null) return;
-
-        Map<GTUtility.ItemId, Integer> actual = xt9y$actualItems(slot);
-        borrowed.replaceAll((id, amount) -> Math.min(amount, actual.getOrDefault(id, 0)));
-        borrowed.entrySet()
-            .removeIf(entry -> entry.getValue() <= 0);
-        if (borrowed.isEmpty()) xt9y$borrowedNc.remove(slot);
-    }
-
-    @Unique
-    private void xt9y$restoreBorrowed(PatternSlot<MTEHatchCraftingInputME> slot) {
-        Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
-        if (borrowed == null || borrowed.isEmpty()) return;
-
-        Map<GTUtility.ItemId, Integer> actual = xt9y$actualItems(slot);
-        for (Map.Entry<GTUtility.ItemId, Integer> entry : borrowed.entrySet()) {
-            int missing = entry.getValue() - actual.getOrDefault(entry.getKey(), 0);
-            if (missing <= 0) continue;
-
-            ItemStack stack = entry.getKey()
-                .getItemStack();
-            stack.stackSize = missing;
-            IAEItemStack restored = AEApi.instance()
-                .storage()
-                .createItemStack(stack);
-            ((AccessorCRIBPatternSlot) (Object) slot).xt9y$insertItem(restored);
-        }
     }
 
     @Unique
@@ -117,6 +81,26 @@ public abstract class MixinCRIBNonConsumable {
         if (amount <= 0) return;
         xt9y$borrowedNc.computeIfAbsent(slot, ignored -> new HashMap<>())
             .merge(GTUtility.ItemId.create(stack), amount, Integer::sum);
+        xt9y$syncRuntime(slot);
+    }
+
+    @Unique
+    private void xt9y$syncRuntime(PatternSlot<MTEHatchCraftingInputME> slot) {
+        Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
+        if (borrowed == null || borrowed.isEmpty()) {
+            NonConsumableCRIBRuntime.clear(slot);
+            return;
+        }
+
+        ItemStack[] inputs = new ItemStack[borrowed.size()];
+        int index = 0;
+        for (Map.Entry<GTUtility.ItemId, Integer> entry : borrowed.entrySet()) {
+            ItemStack stack = entry.getKey()
+                .getItemStack();
+            stack.stackSize = Math.max(1, entry.getValue());
+            inputs[index++] = stack;
+        }
+        NonConsumableCRIBRuntime.set(slot, inputs);
     }
 
     @Unique
@@ -125,22 +109,18 @@ public abstract class MixinCRIBNonConsumable {
         IAEItemStack[] requirements = details.xt9y$getNonConsumableInputs();
         if (requirements.length == 0) return true;
 
-        // A normal GT recipe may decrement an NC-marked item because the underlying recipe does not know about our
-        // AE2-side NC flag. Keep the original reservation authoritative and restore a consumed copy before accepting
-        // another push. This turns arbitrary processing-pattern inputs into true catalysts instead of only working for
-        // GT recipes whose input already has stackSize 0 (molds, circuits, lenses, etc.).
-        xt9y$restoreBorrowed(slot);
-
         try {
             IMEMonitor<IAEItemStack> storage = getProxy().getStorage()
                 .getItemInventory();
             BaseActionSource source = xt9y$requestSource();
             List<IAEItemStack> missing = new ArrayList<>();
 
+            // First simulate every missing reservation so a partial request cannot steal some catalysts and then fail.
             for (IAEItemStack required : requirements) {
                 ItemStack requiredStack = required.getItemStack();
                 GTUtility.ItemId id = GTUtility.ItemId.create(requiredStack);
-                long amount = required.getStackSize() - xt9y$borrowedAmount(slot, id);
+                long encodedAmount = Math.max(1L, required.getStackSize());
+                long amount = encodedAmount - xt9y$borrowedAmount(slot, id);
                 if (amount <= 0) continue;
 
                 IAEItemStack request = required.copy()
@@ -162,12 +142,12 @@ public abstract class MixinCRIBNonConsumable {
                 extracted.add(got);
             }
 
+            // Record ownership only. ProcessingLogic receives disposable synthetic copies through
+            // NonConsumableCRIBRuntime; the real borrowed item never enters PatternSlot.itemInventory.
             for (IAEItemStack got : extracted) {
-                int amount = (int) got.getStackSize();
-                ItemStack stack = got.getItemStack();
-                xt9y$recordBorrowed(slot, stack, amount);
-                ((AccessorCRIBPatternSlot) (Object) slot).xt9y$insertItem(got);
+                xt9y$recordBorrowed(slot, got.getItemStack(), (int) got.getStackSize());
             }
+            xt9y$syncRuntime(slot);
             return true;
         } catch (GridAccessException ignored) {
             return false;
@@ -181,10 +161,8 @@ public abstract class MixinCRIBNonConsumable {
             IAEItemStack rest = Platform.poweredInsert(getProxy().getEnergy(), storage, stack, source);
             if (rest == null || rest.getStackSize() <= 0) continue;
 
-            int amount = (int) rest.getStackSize();
-            ItemStack item = rest.getItemStack();
-            xt9y$recordBorrowed(slot, item, amount);
-            ((AccessorCRIBPatternSlot) (Object) slot).xt9y$insertItem(rest);
+            // If ME cannot take the rollback, retain ownership outside the CRIB and retry from onPostTick.
+            xt9y$recordBorrowed(slot, rest.getItemStack(), (int) rest.getStackSize());
         }
     }
 
@@ -199,46 +177,76 @@ public abstract class MixinCRIBNonConsumable {
         }
     }
 
+    @Unique
+    private boolean xt9y$returnReservation(Map<GTUtility.ItemId, Integer> borrowed, IMEMonitor<IAEItemStack> storage,
+        BaseActionSource source) throws GridAccessException {
+        Iterator<Map.Entry<GTUtility.ItemId, Integer>> iterator = borrowed.entrySet()
+            .iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<GTUtility.ItemId, Integer> entry = iterator.next();
+            ItemStack stack = entry.getKey()
+                .getItemStack();
+            stack.stackSize = entry.getValue();
+            IAEItemStack aeStack = AEApi.instance()
+                .storage()
+                .createItemStack(stack);
+            IAEItemStack rest = Platform.poweredInsert(getProxy().getEnergy(), storage, aeStack, source);
+            int remaining = rest == null ? 0 : (int) rest.getStackSize();
+            if (remaining <= 0) iterator.remove();
+            else entry.setValue(remaining);
+        }
+        return borrowed.isEmpty();
+    }
+
     @Inject(method = "onPostTick", at = @At("TAIL"))
     private void xt9y$returnUnusedNonConsumables(IGregTechTileEntity base, long timer, CallbackInfo ci) {
         if (!base.isServerSide() || xt9y$borrowedNc.isEmpty()) return;
 
-        xt9y$borrowedNc.keySet()
-            .removeIf(slot -> !xt9y$isCurrentSlot(slot));
+        try {
+            IMEMonitor<IAEItemStack> storage = getProxy().getStorage()
+                .getItemInventory();
+            BaseActionSource source = xt9y$requestSource();
 
-        BaseActionSource source = xt9y$requestSource();
-        for (PatternSlot<MTEHatchCraftingInputME> slot : internalInventory) {
-            if (slot == null || !xt9y$borrowedNc.containsKey(slot)) continue;
+            Iterator<Map.Entry<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>>> iterator = xt9y$borrowedNc
+                .entrySet()
+                .iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>> entry = iterator.next();
+                PatternSlot<MTEHatchCraftingInputME> slot = entry.getKey();
 
-            // Recipes with ordinary positive-size inputs consume the catalyst. Recreate the reserved copy inside the
-            // CRIB before deciding whether the slot is finished. Nothing new is extracted from ME here: this is the
-            // same borrowed catalyst represented by the reservation map.
-            xt9y$restoreBorrowed(slot);
+                // Current slots keep their reservation while any real consumable item/fluid is still waiting. A stale
+                // slot (pattern removed/replaced) is refunded immediately.
+                if (xt9y$isCurrentSlot(slot) && (!slot.isItemEmpty() || !slot.isFluidEmpty())) continue;
 
-            Map<GTUtility.ItemId, Integer> borrowed = xt9y$borrowedNc.get(slot);
-            if (borrowed == null || borrowed.isEmpty()) continue;
-            if (!slot.isFluidEmpty()) continue;
-
-            Map<GTUtility.ItemId, Integer> actual = xt9y$actualItems(slot);
-            boolean hasConsumables = false;
-            for (Map.Entry<GTUtility.ItemId, Integer> entry : actual.entrySet()) {
-                if (entry.getValue() > borrowed.getOrDefault(entry.getKey(), 0)) {
-                    hasConsumables = true;
-                    break;
+                if (xt9y$returnReservation(entry.getValue(), storage, source)) {
+                    NonConsumableCRIBRuntime.clear(slot);
+                    iterator.remove();
+                } else {
+                    xt9y$syncRuntime(slot);
                 }
             }
-            if (hasConsumables) continue;
+        } catch (GridAccessException ignored) {}
+    }
 
-            try {
-                slot.refund(getProxy(), source, false);
-            } catch (GridAccessException ignored) {
-                continue;
+    @Inject(method = "refundAll", at = @At("TAIL"))
+    private void xt9y$refundAllReservations(boolean shouldDrop, CallbackInfo ci) {
+        if (xt9y$borrowedNc.isEmpty()) return;
+
+        try {
+            IMEMonitor<IAEItemStack> storage = getProxy().getStorage()
+                .getItemInventory();
+            BaseActionSource source = xt9y$requestSource();
+            Iterator<Map.Entry<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>>> iterator = xt9y$borrowedNc
+                .entrySet()
+                .iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<PatternSlot<MTEHatchCraftingInputME>, Map<GTUtility.ItemId, Integer>> entry = iterator.next();
+                if (xt9y$returnReservation(entry.getValue(), storage, source)) {
+                    NonConsumableCRIBRuntime.clear(entry.getKey());
+                    iterator.remove();
+                }
             }
-
-            // Only an explicit refund is allowed to reduce the reservation. A recipe consuming an NC item must not do
-            // so, otherwise arbitrary catalysts disappear from our bookkeeping after their first operation.
-            xt9y$pruneBorrowedToActual(slot);
-        }
+        } catch (GridAccessException ignored) {}
     }
 
     @Unique
@@ -247,6 +255,29 @@ public abstract class MixinCRIBNonConsumable {
             if (slot == candidate) return true;
         }
         return false;
+    }
+
+    /**
+     * v1.0.5 stored the borrowed catalyst physically in PatternSlot.itemInventory. When upgrading an existing world,
+     * remove the reserved amount from that consumable inventory and keep it represented only by the reservation map.
+     */
+    @Unique
+    private void xt9y$detachLegacyPhysicalReservation(PatternSlot<MTEHatchCraftingInputME> slot,
+        Map<GTUtility.ItemId, Integer> borrowed) {
+        Map<GTUtility.ItemId, Integer> remaining = new HashMap<>(borrowed);
+        for (ItemStack stack : slot.getItemInputs()) {
+            if (stack == null || stack.stackSize <= 0) continue;
+            GTUtility.ItemId id = GTUtility.ItemId.create(stack);
+            int remove = Math.min(stack.stackSize, remaining.getOrDefault(id, 0));
+            if (remove <= 0) continue;
+
+            stack.stackSize -= remove;
+            int left = remaining.get(id) - remove;
+            if (left <= 0) remaining.remove(id);
+            else remaining.put(id, left);
+            if (remaining.isEmpty()) break;
+        }
+        slot.updateSlotItems();
     }
 
     @Inject(method = "saveNBTData", at = @At("TAIL"))
@@ -281,9 +312,12 @@ public abstract class MixinCRIBNonConsumable {
 
     @Inject(method = "loadNBTData", at = @At("TAIL"))
     private void xt9y$loadBorrowedNonConsumables(NBTTagCompound nbt, CallbackInfo ci) {
+        for (PatternSlot<MTEHatchCraftingInputME> slot : xt9y$borrowedNc.keySet()) {
+            NonConsumableCRIBRuntime.clear(slot);
+        }
         xt9y$borrowedNc.clear();
-        NBTTagList slots = nbt.getTagList("xt9yBorrowedNc", Constants.NBT.TAG_COMPOUND);
 
+        NBTTagList slots = nbt.getTagList("xt9yBorrowedNc", Constants.NBT.TAG_COMPOUND);
         for (int i = 0; i < slots.tagCount(); i++) {
             NBTTagCompound slotTag = slots.getCompoundTagAt(i);
             int index = slotTag.getInteger("slot");
@@ -300,13 +334,11 @@ public abstract class MixinCRIBNonConsumable {
                 borrowed.merge(GTUtility.ItemId.create(stack), stack.stackSize, Integer::sum);
             }
 
-            if (!borrowed.isEmpty()) xt9y$borrowedNc.put(slot, borrowed);
-        }
-
-        // If the game was saved after a machine consumed an arbitrary NC catalyst but before the next hatch tick,
-        // recover the reserved copy from NBT instead of silently losing it.
-        for (PatternSlot<MTEHatchCraftingInputME> slot : internalInventory) {
-            if (slot != null) xt9y$restoreBorrowed(slot);
+            if (!borrowed.isEmpty()) {
+                xt9y$borrowedNc.put(slot, borrowed);
+                xt9y$detachLegacyPhysicalReservation(slot, borrowed);
+                xt9y$syncRuntime(slot);
+            }
         }
     }
 }
