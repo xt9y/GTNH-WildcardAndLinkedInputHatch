@@ -151,7 +151,7 @@ public abstract class MixinCRIBNonConsumable {
 
     @Unique
     private void xt9y$rollbackExtraction(PatternSlot<MTEHatchCraftingInputME> slot, IMEMonitor<IAEItemStack> storage,
-        BaseActionSource source, List<IAEItemStack> extracted) {
+        BaseActionSource source, List<IAEItemStack> extracted) throws GridAccessException {
         for (IAEItemStack stack : extracted) {
             IAEItemStack rest = Platform.poweredInsert(getProxy().getEnergy(), storage, stack, source);
             if (rest == null || rest.getStackSize() <= 0) continue;
