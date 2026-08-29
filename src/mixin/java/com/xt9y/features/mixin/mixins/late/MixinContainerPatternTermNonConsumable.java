@@ -23,8 +23,8 @@ import appeng.container.slot.SlotRestrictedInput;
 import appeng.container.sync.ActionHandler;
 import appeng.container.sync.StreamCodecs;
 import appeng.container.sync.SyncRegistrar;
-import appeng.container.sync.handlers.AEStackInventorySyncHandler;
 import appeng.container.sync.handlers.IntSyncHandler;
+import appeng.tile.inventory.IAEStackInventory;
 import appeng.util.Platform;
 
 @Mixin(value = ContainerPatternTerm.class, remap = false)
@@ -32,7 +32,7 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
 
     @Shadow(remap = false)
     @Final
-    public AEStackInventorySyncHandler inputsSync;
+    private IAEStackInventory inputs;
 
     @Shadow(remap = false)
     @Final
@@ -73,11 +73,9 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     private void xt9y$toggleOnServer(int slotIndex) {
         xt9y$refreshPatternState();
         if (isCraftingMode()) return;
-        if (slotIndex < 0 || slotIndex >= inputsSync.get()
-            .getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
+        if (slotIndex < 0 || slotIndex >= inputs.getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
 
-        IAEStack<?> stack = inputsSync.get()
-            .getAEStackInSlot(slotIndex);
+        IAEStack<?> stack = inputs.getAEStackInSlot(slotIndex);
         if (!(stack instanceof IAEItemStack)) return;
 
         int mask = xt9y$ncMaskSync.get() ^ (1 << slotIndex);
@@ -120,14 +118,10 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     private int xt9y$sanitizedMask() {
         int mask = xt9y$ncMaskSync.get();
         int sanitized = 0;
-        int size = Math.min(
-            inputsSync.get()
-                .getSizeInventory(),
-            Integer.SIZE - 1);
+        int size = Math.min(inputs.getSizeInventory(), Integer.SIZE - 1);
         for (int slot = 0; slot < size; slot++) {
             if ((mask & (1 << slot)) == 0) continue;
-            if (inputsSync.get()
-                .getAEStackInSlot(slot) instanceof IAEItemStack) {
+            if (inputs.getAEStackInSlot(slot) instanceof IAEItemStack) {
                 sanitized |= 1 << slot;
             }
         }
@@ -146,10 +140,8 @@ public abstract class MixinContainerPatternTermNonConsumable implements INonCons
     public void xt9y$requestToggleNonConsumable(int slotIndex) {
         xt9y$refreshPatternState();
         if (isCraftingMode() || xt9y$toggleNcAction == null) return;
-        if (slotIndex < 0 || slotIndex >= inputsSync.get()
-            .getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
-        if (!(inputsSync.get()
-            .getAEStackInSlot(slotIndex) instanceof IAEItemStack)) return;
+        if (slotIndex < 0 || slotIndex >= inputs.getSizeInventory() || slotIndex >= Integer.SIZE - 1) return;
+        if (!(inputs.getAEStackInSlot(slotIndex) instanceof IAEItemStack)) return;
 
         // Immediate client feedback. The server action sends the authoritative mask back afterwards.
         xt9y$ncMaskSync.setLocalValue(xt9y$ncMaskSync.get() ^ (1 << slotIndex));
