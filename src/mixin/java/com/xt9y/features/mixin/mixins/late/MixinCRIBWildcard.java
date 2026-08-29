@@ -92,7 +92,7 @@ public abstract class MixinCRIBWildcard {
     }
 
     @Inject(method = "provideCrafting", at = @At("HEAD"))
-    private void xt9y$clearSyntheticPatternMappings(ICraftingProviderHelper craftingTracker, CallbackInfo ci) {
+    private void gt5u$clearSyntheticPatternMappings(ICraftingProviderHelper craftingTracker, CallbackInfo ci) {
         for (ICraftingPatternDetails details : xt9y$syntheticPatterns) {
             patternDetailsPatternSlotMap.remove(details);
         }
@@ -104,7 +104,7 @@ public abstract class MixinCRIBWildcard {
         at = @At(
             value = "INVOKE",
             target = "Lappeng/api/networking/crafting/ICraftingProviderHelper;addCraftingOption(Lappeng/api/networking/crafting/ICraftingMedium;Lappeng/api/networking/crafting/ICraftingPatternDetails;)V"))
-    private void xt9y$wrapStockPattern(ICraftingProviderHelper helper, ICraftingMedium medium,
+    private void gt5u$wrapStockPattern(ICraftingProviderHelper helper, ICraftingMedium medium,
         ICraftingPatternDetails details) {
         // When wildcard mode is on, the RETURN injection below supplies all options, including non-wildcard patterns.
         if (xt9y$enableWildcardExpansion) return;
