@@ -1,0 +1,27 @@
+GTNH-SmallAddons
+
+Small GTNH addons.
+
+build --> ./gradlew build
+
+Linked Input Hatch
+shared --> 4 x 64,000 L tanks by channel
+private --> owner-only channel
+circuit --> local per hatch
+data stick --> left-click copy / right-click paste
+screwdriver --> filter / sneak sorting
+
+CRIB Wildcard Patterns
+pattern --> same-material GregTech inputs/outputs expand across valid unifiable materials
+toggle --> wildcard button or sneak + right-click Soft Mallet
+
+AE2 Interface Wildcard Patterns
+pattern --> same wildcard expansion for AE2 Interfaces
+toggle --> sneak + right-click Soft Mallet
+
+CRIB Non-Consumable Inputs
+NC --> reserved reusable processing-pattern catalyst
+mark --> shift + right-click pattern input
+requires --> NC item in ME storage
+result --> reserved once, not consumed, returned after craft
+wildcard + NC --> supported
